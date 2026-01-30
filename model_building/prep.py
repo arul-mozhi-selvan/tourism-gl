@@ -1,7 +1,6 @@
 # for data manipulation
 import pandas as pd
 import sklearn
-import dotenv
 # for creating a folder
 import os
 # for data preprocessing and pipeline creation
