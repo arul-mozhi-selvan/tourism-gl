@@ -1,5 +1,7 @@
 # for data manipulation
 import pandas as pd
+import sklearn
+import dotenv
 # for creating a folder
 import os
 # for data preprocessing and pipeline creation
@@ -12,8 +14,8 @@ from huggingface_hub import hf_hub_download
 
 
 # Define the repository ID and the filename
-REPO_ID = "arulmozhiselvan/tourism-gl-arul" 
-FILENAME = "data/tourism.csv" 
+REPO_ID = "arulmozhiselvan/superkart" 
+FILENAME = "SuperKart.csv" 
 HF_TOKEN = os.getenv("HF_TOKEN")
 api = HfApi(token=HF_TOKEN)
 
@@ -25,23 +27,23 @@ df = pd.read_csv(csv_file_path)
 
 
 # Read dataset from Hugging Face
-print("Tourism dataset loaded successfully.")
+print("Superkart dataset loaded successfully.")
 print("Shape:", df.shape)
 print("Columns:", df.columns.tolist())
-
+df.drop('Product_Id', axis=1, inplace=True)
 # ---------------------------
 # Encode categorical columns
 # ---------------------------
 label_encoder = LabelEncoder()
 
 categorical_cols = [
-    "TypeofContact",
-    "Occupation",
-    "Gender",
-    "MaritalStatus",
-    "Designation",
-    "ProductPitched"
-]
+    'Product_Sugar_Content',
+    'Product_Type',
+    'Store_Id',
+    'Store_Size',
+    'Store_Location_City_Type',
+    'Store_Type'
+    ]
 
 for col in categorical_cols:
     if col in df.columns:
@@ -52,7 +54,7 @@ for col in categorical_cols:
 # ---------------------------
 # Target column
 # ---------------------------
-target_col = "ProdTaken"
+target_col = "Product_Store_Sales_Total"
 
 if target_col not in df.columns:
     raise ValueError(f"Target column '{target_col}' not found")
@@ -64,10 +66,10 @@ X = df.drop(columns=[target_col])
 y = df[target_col]
 
 Xtrain, Xtest, ytrain, ytest = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
+    X, y, test_size=0.2, random_state=42
 )
 # ---------------------------
-out_dir = "tourism_project/data"
+out_dir = "data"
 os.makedirs(out_dir, exist_ok=True)
 
 Xtrain_path = f"{out_dir}/Xtrain.csv"
@@ -92,7 +94,7 @@ for file_path in files:
     api.upload_file(
         path_or_fileobj=file_path,
         path_in_repo=os.path.basename(file_path),   # uploads just filename
-        repo_id="arulmozhiselvan/tourism-gl-arul",
+        repo_id="arulmozhiselvan/superkart",
         repo_type="dataset",
     )
     print(f"Uploaded {file_path} to HF dataset repo.")

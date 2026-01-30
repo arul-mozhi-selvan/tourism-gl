@@ -12,7 +12,6 @@ from sklearn.pipeline import make_pipeline
 # for model training, tuning, and evaluation
 import xgboost as xgb
 from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report
 
 # for model serialization
 import joblib
@@ -23,7 +22,7 @@ import joblib
 # Configuration / HF dataset paths
 # -------------------------
 # Replace HF usernames/repos if different
-HF_DATASET_REPO = "arulmozhiselvan/tourism-gl-arul"
+HF_DATASET_REPO = "arulmozhiselvan/superkart"
 XTRAIN_FILENAME = "Xtrain.csv"
 XTEST_FILENAME  = "Xtest.csv"
 YTRAIN_FILENAME = "ytrain.csv"
@@ -60,22 +59,22 @@ print("Xtrain:", Xtrain.shape, "Xtest:", Xtest.shape, "ytrain:", ytrain.shape, "
 # Feature selection (adjust to match your dataset)
 # -------------------------
 numeric_features = [
-    'Age',
-    'CityTier',
-    'NumberOfPersonVisiting',
-    'PreferredPropertyStar',
-    'NumberOfTrips',
-    'NumberOfChildrenVisiting',
-    'MonthlyIncome',
-    'PitchSatisfactionScore',
-    'NumberOfFollowups',
-    'DurationOfPitch'
-]
+    'Product_Weight',
+    'Product_Allocated_Area',
+    'Product_MRP',
+    'Store_Establishment_Year',
+    'Product_Store_Sales_Total'
+    ]
 numeric_features = [c for c in numeric_features if c in Xtrain.columns]
 
 categorical_features = [c for c in [
-    'TypeofContact', 'Occupation', 'Gender', 'MaritalStatus', 'Designation', 'ProductPitched'
-] if c in Xtrain.columns]
+    'Product_Sugar_Content',
+    'Product_Type',
+    'Store_Id',
+    'Store_Size',
+    'Store_Location_City_Type',
+    'Store_Type'
+    ] if c in Xtrain.columns]
 
 print("Numeric features used:", numeric_features)
 print("Categorical features used:", categorical_features)
@@ -103,15 +102,13 @@ preprocessor = make_column_transformer(
 # -------------------------
 # Define XGBoost model
 # -------------------------
-xgb_model = xgb.XGBClassifier(scale_pos_weight=class_weight, random_state=42, use_label_encoder=False, eval_metric='logloss')
+xgb_model = xgb.XGBRegressor(objective='reg:squarederror')
 
 # Hyperparameter grid (same style as your example)
 param_grid = {
-    'xgbclassifier__n_estimators': [50, 75, 100],
-    'xgbclassifier__max_depth': [2, 3, 4],
-    'xgbclassifier__colsample_bytree': [0.4, 0.5, 0.6],
-    'xgbclassifier__learning_rate': [0.01, 0.05, 0.1],
-    'xgbclassifier__reg_lambda': [0.4, 0.5, 0.6],
+    'xgbregressor__max_depth': [3, 5, 7, 10],
+    'xgbregressor__n_estimators': [100, 200, 500],
+    'xgbregressor__learning_rate': [0.01, 0.1, 0.2]
 }
 
 # Create pipeline
@@ -125,7 +122,7 @@ model_pipeline = make_pipeline(preprocessor, xgb_model)
 # Grid search with cross-validation and MLflow logging
 # -------------------------
 
-grid_search = GridSearchCV(model_pipeline, param_grid, cv=5, scoring='recall', n_jobs=-1)
+grid_search = GridSearchCV(model_pipeline, param_grid, cv=5)
 grid_search.fit(Xtrain, ytrain)
 
 # Best model
@@ -138,23 +135,8 @@ y_pred_train = best_model.predict(Xtrain)
 # Predict on test set
 y_pred_test = best_model.predict(Xtest)
 
-# Evaluation
-print("\nTraining Classification Report:")
-print(classification_report(ytrain, y_pred_train))
-
-print("\nTest Classification Report:")
-print(classification_report(ytest, y_pred_test))
-
-# Log classification metrics (train & test)
-try:
-    train_report = classification_report(ytrain, y_pred_train, output_dict=True)
-    test_report  = classification_report(ytest, y_pred_test, output_dict=True)
-
-except Exception as e:
-    print("Warning: failed to compute/log some metrics:", e)
-
 # Save best model locally
-model_filename = "tourism_best_model_v1.joblib"
+model_filename = "best_model_v1.joblib"
 joblib.dump(best_model, model_filename)
 print("Model saved as", model_filename)
 
@@ -162,7 +144,7 @@ print("Model saved as", model_filename)
 # -------------------------
 # Upload saved model to Hugging Face Model Hub (new model repo)
 # -------------------------
-repo_id = "arulmozhiselvan/arul-gl-tourism-xgboost-model"
+repo_id = "arulmozhiselvan/superkart-model"
 repo_type = "model"
 
 api = HfApi(token=os.getenv("HF_TOKEN"))

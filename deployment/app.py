@@ -1,41 +1,70 @@
 import streamlit as st
-import xgboost as xgb
 import pandas as pd
-import numpy as np
 from huggingface_hub import hf_hub_download
+import joblib
+import os
 
-# Load the trained model from huggingface hub
-model = xgb.XGBClassifier(enable_categorical=True)
-model_path = hf_hub_download(repo_id="arulmozhiselvan/arul-gl-tourism-xgboost-model", filename="best_model.json")
-model.load_model(model_path)
+# -------------------------
+# Configuration
+# -------------------------
+HF_MODEL_REPO = "arulmozhiselvan/superkart-model"
+MODEL_FILENAME = "best_model_v1.joblib"
 
-st.title("Tourism Product Purchase Prediction")
-st.write("Enter the details to predict if a customer will purchase the tourism product.")
-def user_input_features():
-    # get user inputs for all features from numerical and categorical columns
-    inputs = {}
-    for col in ['Age', 'DurationOfPitch', 'NumberOfFollowups', 'PreferredPropertyStar', 'NumberOfTrips', 'Passport', 'PitchSatisfactionScore', 'OwnCar', 'NumberOfChildrenVisiting', 'MonthlyIncome']:
-        value = st.number_input(f"Enter {col}:", value=0)
-        inputs[col] = value
-    for col in ['TypeofContact', 'Occupation', 'Gender', 'MaritalStatus', 'ProductPitched', 'CityTier', 'Designation', 'MonthlyIncome', 'Country']:
-        value = st.text_input(f"Enter {col}:")
-        inputs[col] = value
-    features = pd.DataFrame(inputs, index=[0])
-    for col in ['TypeofContact', 'Occupation', 'Gender', 'MaritalStatus', 'ProductPitched', 'CityTier', 'Designation', 'MonthlyIncome', 'Country']:
-        features[col] = features[col].astype("category")
-    return features
+# -------------------------
+# Download & load model
+# -------------------------
+model = None
+try:
+    model_path = hf_hub_download(repo_id=HF_MODEL_REPO, filename=MODEL_FILENAME, repo_type="model", token=os.getenv("HF_TOKEN"))
+    model = joblib.load(model_path)
+    st.write(f"Loaded model from Hugging Face: {HF_MODEL_REPO}/{MODEL_FILENAME}")
+except Exception as e:
+    st.warning(f"Could not download model from Hugging Face ({HF_MODEL_REPO}).\nError: {e}\nFalling back to local file if present.")
+    if os.path.exists(MODEL_FILENAME):
+        model = joblib.load(MODEL_FILENAME)
+        st.write(f"Loaded local model file: {MODEL_FILENAME}")
+    else:
+        st.error("Model not available. Please upload the model to HF or place it locally.")
+        st.stop()
 
-input_df = user_input_features()
-# arrange the input dataframe columns in the same order as training data
+# -------------------------
+# Streamlit UI
+# -------------------------
+st.title("SuperKart Sales Prediction App")
+st.write("Predict product sales at different stores using trained ML model.")
+
+# --- Customer details
+Product_Weight = st.number_input("Product Weight", value=12.66)
+Product_Sugar_Content = st.selectbox("Sugar Content", ["Low Sugar","No Sugar","Medium Sugar","High Sugar"])
+Product_Allocated_Area = st.number_input("Allocated Area", value=0.027, step=0.001, format="%.3f")
+Product_Type = st.text_input("Product Type", "Frozen Foods")
+Product_MRP = st.number_input("Product MRP", value=117.08)
+Store_Id = st.text_input("Store Id", "OUT004")
+Store_Establishment_Year = st.number_input("Store Establishment Year", value=2009, step=1)
+Store_Size = st.selectbox("Store Size", ["Small", "Medium", "High"])
+Store_Location_City_Type = st.selectbox("Store City Type", ["Tier 1", "Tier 2", "Tier 3"])
+Store_Type = st.text_input("Store Type", "Supermarket Type2")
 
 
-st.subheader("User Input Features")
+# Assemble input into DataFrame matching training columns (raw — pipeline should handle preprocessing)
+input_df = pd.DataFrame([{
+    "Product_Weight": Product_Weight,
+    "Product_Sugar_Content": Product_Sugar_Content,
+    "Product_Allocated_Area": Product_Allocated_Area,
+    "Product_Type": Product_Type,
+    "Product_MRP": Product_MRP,
+    "Store_Id": Store_Id,
+    "Store_Establishment_Year": Store_Establishment_Year,
+    "Store_Size": Store_Size,
+    "Store_Location_City_Type": Store_Location_City_Type,
+    "Store_Type": Store_Type
+}])
 
-st.write(input_df)
-#one hot encode categorical variables
-input_df = pd.get_dummies(input_df, drop_first=True)
-input_df = input_df[['Age', 'CityTier', 'DurationOfPitch', 'NumberOfPersonVisiting', 'NumberOfFollowups', 'PreferredPropertyStar', 'NumberOfTrips', 'Passport', 'PitchSatisfactionScore', 'OwnCar', 'NumberOfChildrenVisiting', 'MonthlyIncome', 'TypeofContact_Self Enquiry', 'Occupation_Large Business', 'Occupation_Salaried', 'Occupation_Small Business', 'Gender_Female', 'Gender_Male', 'ProductPitched_Deluxe', 'ProductPitched_King', 'ProductPitched_Standard', 'ProductPitched_Super Deluxe', 'MaritalStatus_Married', 'MaritalStatus_Single', 'MaritalStatus_Unmarried', 'Designation_Executive', 'Designation_Manager', 'Designation_Senior Manager', 'Designation_VP']]
-# Predict the output
-prediction = model.predict(input_df)
-st.subheader("Prediction")
-st.write("The customer will purchase the product." if prediction[0] == 1 else "The customer will not purchase the product.")
+st.subheader("Input Preview")
+st.dataframe(input_df.T, width=700)
+
+# Prediction
+if st.button("Predict Purchase Probability"):
+    prediction = model.predict(input_df)
+    st.subheader("Prediction Result")
+    st.write(f"Predicted Product Store Sales Total: {prediction[0]:.2f}")
