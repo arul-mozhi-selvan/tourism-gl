@@ -64,7 +64,7 @@ st.subheader("Input Preview")
 st.dataframe(input_df.T, width=700)
 
 # Prediction
-if st.button("Predict Purchase Probability"):
+if st.button("Predict Sales"):
     prediction = model.predict(input_df)
     st.subheader("Prediction Result")
     st.write(f"Predicted Product Store Sales Total: {prediction[0]:.2f}")
